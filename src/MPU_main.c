@@ -80,12 +80,6 @@ float AccZ;
 float pitch, roll;
 
 
-int16_t GyroX, GyroY, GyroZ;
-float RateX, RateY, RateZ;
-
-
-char msg[100];
-
 //MPU6050 Initialization:
 
 void MPU_Init(void) {
