@@ -22,11 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "liquidcrystal_i2c.h"
-
-#include <stdio.h>
-
-#include <math.h>
-
+#include <stdlib.h>
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,8 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define M_PI 3.14159265358979323846
-
+#define M_PI 3.14159265358979323846 //for radian to degree conversion
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,7 +42,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef huart2;
@@ -59,7 +54,6 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -67,6 +61,7 @@ static void MX_I2C2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 int a; //temp
 
 int16_t AccXLSB; //temp
@@ -78,6 +73,18 @@ float AccY;
 float AccZ;
 
 float pitch, roll;
+
+
+
+void errorLED(void) {
+	//LED on Nucleo board toggles on/off to indicate HMC5883L initialization error
+
+	while(1) {
+		HAL_GPIO_TogglePin(ERROR_LED_GPIO_Port, ERROR_LED_Pin);
+		HAL_Delay(700);
+	}
+}
+
 
 
 //MPU6050 Initialization:
@@ -93,7 +100,7 @@ void MPU_Init(void) {
 	if (ret == HAL_OK)
 	  a = 1; //temp
 	else
-	  a = 0;
+	  errorLED();
 
 	//HAL_Delay(3000); //temp
 
@@ -121,13 +128,13 @@ void MPU_Init(void) {
 	//To set full-scale range of accelerometer as +-4g, we need to change CONFIG_ACC register, which is register 28.
 	//We must set bit 4 & bit 3 as 01 respectively.
 
-	temp_data = 0b00001000; //value to write to the register
+	uint8_t temp_data = 0b00001000; //value to write to the register
 	ret = HAL_I2C_Mem_Write(&hi2c2, (0b1101000<<1)+0, 28, 1, &temp_data, 1, HAL_MAX_DELAY);
 
 	if (ret == HAL_OK)
 	  a = 1; //temp
 	else
-	  a = 0;
+	  errorLED();
 
 	//HAL_Delay(3000); //temp
 
@@ -140,12 +147,15 @@ void MPU_Init(void) {
 	if (ret == HAL_OK)
 	  a = 1; //temp
 	else
-	  a = 0;
+	  errorLED();
 
 	//HAL_Delay(3000); //temp
 
 	//Now initialization is over and we can finally start reading sensor values from registers.
 }
+
+
+
 
 
 /* USER CODE END 0 */
@@ -180,12 +190,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_I2C1_Init();
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
 
-  MPU_Init();
 
+  MPU_Init();
 
   /* USER CODE END 2 */
 
@@ -193,32 +202,32 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint8_t data[2]; //2 byte data buffer to store the register values
-	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 59, 1, data, 2, HAL_MAX_DELAY);
-	  //Since we are reading, we set the LSB of I2C address as 1.
-	  //First data register for reading accelerometer values is 59. We only need to pass this first register since we can read following sequential registers.
-	  //1 because every register is 1 byte.
-	  //2 bytes because we want to read registers 59 and 60 for X-axis acceleration.
+	  	  uint8_t data[2]; //2 byte data buffer to store the register values
+	  	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 59, 1, data, 2, HAL_MAX_DELAY);
+	  	  //Since we are reading, we set the LSB of I2C address as 1.
+	  	  //First data register for reading accelerometer values is 59. We only need to pass this first register since we can read following sequential registers.
+	  	  //1 because every register is 1 byte.
+	  	  //2 bytes because we want to read registers 59 and 60 for X-axis acceleration.
 
-	  AccXLSB = ((int16_t) data[0] << 8) + data[1];
-
-
-	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 61, 1, data, 2, HAL_MAX_DELAY);
-	  AccYLSB = ((int16_t) data[0] << 8) + data[1];
-
-	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 63, 1, data, 2, HAL_MAX_DELAY);
-	  AccZLSB = ((int16_t) data[0] << 8) + data[1];
+	  	  AccXLSB = ((int16_t) data[0] << 8) + data[1];
 
 
-	  AccX = (float) AccXLSB / 8129 + 0.15;
-	  AccY = (float) AccYLSB / 8129 - 0.015;
-	  AccZ = (float) AccZLSB / 8129 + 0.07;
+	  	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 61, 1, data, 2, HAL_MAX_DELAY);
+	  	  AccYLSB = ((int16_t) data[0] << 8) + data[1];
+
+	  	  HAL_I2C_Mem_Read(&hi2c2, (0b1101000<<1)+1, 63, 1, data, 2, HAL_MAX_DELAY);
+	  	  AccZLSB = ((int16_t) data[0] << 8) + data[1];
 
 
-	  roll = atan(AccY / sqrt(AccZ*AccZ + AccX*AccX) ) * 180/M_PI;
-	  pitch = atan( -AccX / sqrt(AccY*AccY + AccZ*AccZ) ) * 180/M_PI; //atan() returns rad
-	  
-	  
+	  	  AccX = (float) AccXLSB / 8129 + 0.15;
+	  	  AccY = (float) AccYLSB / 8129 - 0.015;
+	  	  AccZ = (float) AccZLSB / 8129 + 0.07;
+
+
+	  	  roll = atan(AccY / sqrt(AccZ*AccZ + AccX*AccX) ) * 180/M_PI;
+	  	  pitch = atan( -AccX / sqrt(AccY*AccY + AccZ*AccZ) ) * 180/M_PI; //atan() returns rad
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -265,46 +274,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV16;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
@@ -392,7 +367,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ERROR_LED_GPIO_Port, ERROR_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -400,12 +375,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pin : ERROR_LED_Pin */
+  GPIO_InitStruct.Pin = ERROR_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(ERROR_LED_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
